@@ -109,10 +109,11 @@ void dispatch_write_object(const array_type_descriptor<T>& desc,
 {
 	writer.begin_array();
 	auto size = desc.get_size(t);
-	for (int n = 0; n < size; n++)
+	for (decltype(size) n = 0; n < size; n++)
 	{
 		writer.begin_item();
-		write_json(writer, t[n]);
+		// write_json(writer, t[n]); //TODO: this should be more general 
+		write_xml(writer, t[n]);
 		writer.end_item();
 	}
 	writer.end_array();

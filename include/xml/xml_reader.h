@@ -1,10 +1,11 @@
-#ifndef __JSON_READER__
-#define __JSON_READER__
+#ifndef __XML_READER__
+#define __XML_READER__
 
 #include <sstream>
 #include <stdexcept>
 
-#include "json_lexer.h"
+#include "../common/reader.h"
+#include "xml_lexer.h"
 
 /**
  * json objects reading class, reads a JSON-formatted stream
@@ -16,17 +17,17 @@
  * */
 
 template <typename TStream>
-class json_reader
+class xml_reader  : public reader<TStream>
 {
-	json_lexer<TStream> m_lexer;
+	xml_lexer<TStream> m_lexer;
 	/**
 	 * ensure that a string has been read and stored in
 	 * the result reference parameter, lexer is advanced
 	 * afterwards
 	 * */
-	bool read_string(std::string &result)
+	bool read_tag(std::string &result)
 	{
-		if (m_lexer.get().type == json_lexicon::STRING)
+		if (m_lexer.get().type == xml_lexicon::TAG)
 		{
 			result = m_lexer.get().lexicon;
 			m_lexer.advance();
@@ -38,8 +39,32 @@ class json_reader
 		}
 	}
 
+	bool read_string(std::string &result)
+	{
+		if (m_lexer.get().type == xml_lexicon::STRING)
+		{
+			result = m_lexer.get().lexicon;
+			m_lexer.advance();
+			return true;
+		} 
+		else if (is_in_item())
+		{
+			m_lexer.advance();
+			result = m_lexer.get().lexicon;
+			m_lexer.advance();
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	bool is_in_item() 
+	{
+		return match_symbol("item");
+	}
 public:
-	json_reader(TStream &stream) : m_lexer(stream)
+	xml_reader(TStream &stream) : reader<TStream>(), m_lexer(stream)
 	{
 	}
 
@@ -52,7 +77,7 @@ public:
 	 * */
 	bool match_symbol(const std::string &symbol)
 	{
-		return (m_lexer.get().type == json_lexicon::SYMBOL) &&
+		return (m_lexer.get().type == xml_lexicon::TAG) &&
 			   (symbol == m_lexer.get().lexicon);
 	}
 
@@ -60,42 +85,42 @@ public:
 	 * matches the next characters against the "{" 
 	 * JSON's object entry
 	 * */
-	bool is_begin_object()
-	{
-		return match_symbol("{");
+	bool is_begin_object(const std::string& name)
+	{	
+		return match_symbol(name );
 	}
 
 	/**
 	 * matches the next characters against the "}" 
 	 * JSON's object end
 	 * */
-	bool is_end_object()
+	bool is_end_object(const std::string& name)
 	{
-		return match_symbol("}");
+		return match_symbol(name);
 	}
 
 	/**
 	 * advances the lexer to read the next token
 	 * after ensuring object's start
 	 * */
-	void enter_object()
+	void enter_object(const std::string& name)
 	{
-		if (match_symbol("{"))
+		if (match_symbol(name))
 			m_lexer.advance();
 		else
-			throw std::runtime_error("expected '{'");
+			throw std::runtime_error("expected tag \"< " + name + "\">\"");
 	}
 
 	/**
 	 * advances the lexer to read the next token
 	 * after ensuring current object's end
 	 * */
-	void leave_object()
+	void leave_object(const std::string& name)
 	{
-		if (match_symbol("}"))
+		if (match_symbol(name))
 			m_lexer.advance();
 		else
-			throw std::runtime_error("expected '}'");
+			throw std::runtime_error("expected tag \"<\\" + name + "\">\"");
 	}
 
 	/**
@@ -104,7 +129,7 @@ public:
 	 * */
 	bool is_begin_array()
 	{
-		return match_symbol("[");
+		return match_symbol("array");
 	}
 
 	/**
@@ -113,7 +138,7 @@ public:
 	 * */
 	bool is_end_array()
 	{
-		return match_symbol("]");
+		return match_symbol("/array");
 	}
 
 	/**
@@ -122,10 +147,10 @@ public:
 	 * */
 	void enter_array()
 	{
-		if (match_symbol("["))
+		if (match_symbol("array"))
 			m_lexer.advance();
 		else
-			throw std::runtime_error("expected '['");
+			throw std::runtime_error("expected <array>");
 	}
 
 	/**
@@ -135,10 +160,10 @@ public:
 
 	void leave_array()
 	{
-		if (match_symbol("]"))
+		if (match_symbol("/array"))
 			m_lexer.advance();
 		else
-			throw std::runtime_error("expected ']'");
+			throw std::runtime_error("expected </array>");
 	}
 
 	/**
@@ -148,10 +173,10 @@ public:
 	 * */
 	void next_item()
 	{
-		if (match_symbol(","))
+		if (match_symbol("/item"))
 			m_lexer.advance();
-		else
-			throw std::runtime_error("expected ','");
+		// else
+			// throw std::runtime_error("expected tag \"item\"");
 	}
 
 	/**
@@ -162,11 +187,9 @@ public:
 
 	void read_prop(std::string &prop)
 	{
-		if (read_string(prop))
+		if (read_tag(prop))
 		{
-			if (!match_symbol(":"))
-				throw std::runtime_error("expected ':'");
-			m_lexer.advance();
+			// m_lexer.advance();
 		}
 		else
 		{
@@ -190,25 +213,18 @@ public:
 	 * */
 	void next_prop(std::string &prop)
 	{
-		if (match_symbol(","))
-		{
-			m_lexer.advance();
-			read_prop(prop);
-		}
-		else
-		{
-			throw std::runtime_error("expected ','");
-		}
+		m_lexer.advance();
+		read_prop(prop);
 	}
 
 	/**
 	 * ensures that the token being read is an identifier
 	 * (just don't know what's the goddamn purpose it
-	 * servers -_-)
+	 * serves -_-)
 	 * */
 	bool match_identifier(const std::string& id) 
 	{
-		return (m_lexer.get().type == json_lexicon::IDENTIFIER)
+		return (m_lexer.get().type == xml_lexicon::IDENTIFIER)
 				&& (id == m_lexer.get().lexicon);
 	}
 
@@ -220,13 +236,13 @@ public:
 
 	void read_value (bool& result)
 	{
-		if ((m_lexer.get().type == json_lexicon::STRING) && 
+		if ((m_lexer.get().type == xml_lexicon::STRING) && 
 			(m_lexer.get().lexicon == "true"))
 		{
 			result = true;
 			m_lexer.advance();
 		}
-		else if ((m_lexer.get().type == json_lexicon::STRING) &&
+		else if ((m_lexer.get().type == xml_lexicon::STRING) &&
 			(m_lexer.get().lexicon == "false"))
 		{
 			result = false;
@@ -245,8 +261,9 @@ public:
 
 	void read_value(std::string& result)
 	{
-		if (!read_string(result))
+		if (!read_string(result) && !is_end_array()){
 			throw std::runtime_error("expected string");
+		}
 	}
 
 	/**
@@ -257,7 +274,7 @@ public:
 
 	void read_value(int& result)
 	{
-		if (m_lexer.get().type == json_lexicon::INTEGER)
+		if (m_lexer.get().type == xml_lexicon::INTEGER)
 		{
 			std::stringstream sint(m_lexer.get().lexicon);
 			sint >> result;
@@ -277,8 +294,8 @@ public:
 
 	bool read_value(float& result)
 	{
-		if ((m_lexer.get().type == json_lexicon::FLOAT) 
-			|| (m_lexer.get().type == json_lexicon::INTEGER))
+		if ((m_lexer.get().type == xml_lexicon::FLOAT) 
+			|| (m_lexer.get().type == xml_lexicon::INTEGER))
 		{
 			std::stringstream sfloat(m_lexer.get().lexicon);
 			sfloat >> result;
@@ -296,9 +313,9 @@ public:
  * when passed a stream object to conduct a read operation
  * */
 template <typename TStream>
-json_reader<TStream> get_json_reader(TStream& stream)
+xml_reader<TStream> get_xml_reader(TStream& stream)
 {
-	return json_reader<TStream>(stream);
+	return xml_reader<TStream>(stream);
 }
 
-#endif /* __JSON_READER__ */
+#endif /* __XML_READER__ */

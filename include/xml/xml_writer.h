@@ -1,9 +1,10 @@
-#ifndef __JSON_WRITER__
-#define __JSON_WRITER__
+#ifndef __XML_WRITER__
+#define __XML_WRITER__
 
 #include <string>
 #include <iostream>
 
+#include "../common/writer.h"
 /**
  * an ostream wrapper class, writes given object using the JSON
  * formalism through a set of sequantial member functions calls
@@ -12,7 +13,7 @@
  *  value output functions : output actual values such as ints, floats ...
  * */
 template <typename TStream>
-class json_writer
+class xml_writer : public writer<TStream>
 {
     TStream& m_stream;
     bool m_first;
@@ -21,7 +22,7 @@ public:
      * class constructor, takes as a parameter the 
      * stream being wrapped inside the writer
      * */
-    json_writer(TStream& stream) : m_stream(stream)
+    xml_writer(TStream& stream) : writer<TStream>(), m_stream(stream)
     {
         m_first = false;
     }
@@ -33,7 +34,7 @@ public:
      * */
     void begin_object(const char* name)
     {
-        m_stream << "{";
+        m_stream << "<" << name << ">";
         m_first = true;
     }
 
@@ -41,9 +42,9 @@ public:
      * called after any object write operation, to 
      * end the serialization according to json's formalism "}"
      * */
-    void end_object()
+    void end_object(const char* name = "")
     {
-        m_stream << "}";
+        m_stream << "</" << name << ">";
     }
     
     /**
@@ -53,11 +54,11 @@ public:
      * */
     void begin_prop(const char* name)
     {
-        if (m_first)
-            m_first = false;
-        else
-            m_stream << ",";
-        m_stream << "\"" << name << "\":";
+        // if (m_first)
+        //     m_first = false;
+        // else
+            m_stream << "<" << name << ">";
+        // m_stream << "\"" << name << "\":";
     }
     
      /**
@@ -65,8 +66,9 @@ public:
      * does nothing :3
      * */
 
-    void end_prop()
+    void end_prop(const char* name = "")
     {
+		m_stream << "</" << name << ">";
     }
     /**
      * writes an integer value to the given stream
@@ -145,7 +147,7 @@ public:
 
     void begin_array()
     {
-        m_stream << "[";
+        m_stream << "<array>";
         m_first = true;
     }
 
@@ -155,7 +157,7 @@ public:
      * */
     void end_array()
     {
-        m_stream << "]";
+        m_stream << "</array>";
     }
 
     /**
@@ -163,14 +165,15 @@ public:
      * */
     void begin_item()
     {
-        if (m_first)
-            m_first = false;
-        else
-            m_stream << ",";
+        // if (m_first)
+        //     m_first = false;
+        // else
+            m_stream << "<item>";
     }
 
     void end_item()
     {
+		m_stream << "</item>";
     }
 };
 
@@ -179,8 +182,8 @@ public:
  * when passed a stream object to conduct a write operation
  * */
 template <typename TStream>
-json_writer<TStream> get_json_writer(TStream& stream)
+xml_writer<TStream> get_xml_writer(TStream& stream)
 {
-    return json_writer<TStream>(stream);
+    return xml_writer<TStream>(stream);
 }
 #endif /* __JSON_WRITER__ */

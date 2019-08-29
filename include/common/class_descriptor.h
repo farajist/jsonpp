@@ -1,6 +1,7 @@
 #ifndef __CLASS_DESCRIPTOR__
 #define __CLASS_DESCRIPTOR__
 #include <string>
+#include <iostream>
 #include <vector>
 #include <stdexcept>
 #include <cstddef>
@@ -108,7 +109,7 @@ class write_object_functor
     {
         m_writer.begin_prop(sz_prop);
         write_object(m_writer, m_t.*p_prop_offset);
-        m_writer.end_prop();
+        m_writer.end_prop(sz_prop);
     }
 };
 
@@ -138,7 +139,8 @@ class read_object_functor
     {
         if (m_sprop == sz_prop) 
         {
-            read_json(m_reader, m_t.*p_prop_offset);
+            // read_json(m_reader, m_t.*p_prop_offset);
+            read_xml(m_reader, m_t.*p_prop_offset);
             m_bfound = true;
         }
     }
@@ -162,8 +164,8 @@ template <typename TReader, typename T>
 void dispatch_read_object(const class_descriptor<T>& desc,
                           TReader &reader, T& t)
 {
-    reader.enter_object();
-    if (!reader.is_end_object()) 
+    reader.enter_object(desc.get_name());
+    if (!reader.is_end_object(desc.get_name())) 
     {
         std::string s_prop;
         reader.first_prop(s_prop);
@@ -172,13 +174,13 @@ void dispatch_read_object(const class_descriptor<T>& desc,
             read_object_functor<TReader, T> functor(reader, t, s_prop);
             desc.foreach_prop(functor);
             if (functor.not_found())
-                throw std::runtime_error("couldn't find property");
-            if (reader.is_end_object())
+                    throw std::runtime_error("couldn't find property");
+            if (reader.is_end_object(desc.get_name()))
                 break;
             reader.next_prop(s_prop);
         }
     }
-    reader.leave_object();
+    reader.leave_object(desc.get_name());
 }
 
 /**
@@ -197,7 +199,7 @@ void dispatch_write_object(const class_descriptor<T> &desc,
     write_object_functor<TWriter, T> functor(writer, t);
     writer.begin_object(desc.get_name());
     desc.foreach_prop(functor);
-    writer.end_object();
+    writer.end_object(desc.get_name());
 }
 
 /** =======================================================
